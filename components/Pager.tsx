@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { getUnreadPage, markPageRead, sendNumericPage, type ReceivedPage } from "../lib/pages";
 
 type Screen = "standby" | "new" | "message" | "sent";
 type PageStage = "number" | "message";
@@ -113,6 +114,7 @@ function playPagerAlert() {
 export default function Pager({ number, onLogout }: { number: string; onLogout: () => void }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const timers = useRef<Set<number>>(new Set());
+  const receivedPageId = useRef<number | null>(null);
   function later(callback: () => void, delay: number) {
     const timer = window.setTimeout(() => {
       timers.current.delete(timer);
@@ -132,9 +134,43 @@ export default function Pager({ number, onLogout }: { number: string; onLogout: 
 
   const [pagerNumber, setPagerNumber] = useState("");
   const [pageMessage, setPageMessage] = useState("");
+  const [pageError, setPageError] = useState("");
+  const [sending, setSending] = useState(false);
+  const [receivedPage, setReceivedPage] = useState<ReceivedPage | null>(null);
 
   const [lcdFlash, setLcdFlash] = useState(false);
   const [pagerBuzz, setPagerBuzz] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function pollInbox() {
+      try {
+        const page = await getUnreadPage();
+        if (!active || !page || receivedPageId.current !== null) return;
+        receivedPageId.current = page.id;
+        setReceivedPage(page);
+        setSettingsOpen(false);
+        setScreen("new");
+        setLcdFlash(true);
+        setPagerBuzz(true);
+        playPagerAlert();
+        const flashTimer = window.setTimeout(() => setLcdFlash(false), 120);
+        const buzzTimer = window.setTimeout(() => setPagerBuzz(false), 500);
+        timers.current.add(flashTimer);
+        timers.current.add(buzzTimer);
+      } catch {
+        // A temporary network failure should not interrupt the pager UI.
+      }
+    }
+
+    void pollInbox();
+    const interval = window.setInterval(pollInbox, 4000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, []);
 
   function flashLCD() {
     setLcdFlash(true);
@@ -152,6 +188,14 @@ export default function Pager({ number, onLogout }: { number: string; onLogout: 
   function nextScreen() {
     setSettingsOpen(false);
     if (screen === "standby") {
+      const testPage: ReceivedPage = {
+        id: 0,
+        senderNumber: "5271004",
+        message: "8282",
+        createdAt: 0,
+      };
+      receivedPageId.current = 0;
+      setReceivedPage(testPage);
       playPagerAlert();
 
       changeScreen("new");
@@ -166,10 +210,13 @@ export default function Pager({ number, onLogout }: { number: string; onLogout: 
     }
 
     if (screen === "new") {
+      if (receivedPage && receivedPage.id > 0) void markPageRead(receivedPage.id);
       changeScreen("message");
       return;
     }
 
+    receivedPageId.current = null;
+    setReceivedPage(null);
     changeScreen("standby");
   }
 
@@ -177,19 +224,24 @@ export default function Pager({ number, onLogout }: { number: string; onLogout: 
     setSettingsOpen(false);
     setPagerNumber("");
     setPageMessage("");
+    setPageError("");
     setPageStage("number");
     setKeypadOpen(true);
   }
 
   function closeKeypad() {
+    if (sending) return;
     setKeypadOpen(false);
     setPagerNumber("");
     setPageMessage("");
+    setPageError("");
     setPageStage("number");
   }
 
   function pressKey(key: string) {
+    if (sending) return;
     playDTMF(key);
+    setPageError("");
 
     if (key === "*") {
       if (pageStage === "number") {
@@ -222,13 +274,7 @@ export default function Pager({ number, onLogout }: { number: string; onLogout: 
         return;
       }
 
-      setKeypadOpen(false);
-
-      changeScreen("sent");
-
-      later(() => {
-        changeScreen("standby");
-      }, 1800);
+      void submitPage();
 
       return;
     }
@@ -248,6 +294,26 @@ export default function Pager({ number, onLogout }: { number: string; onLogout: 
     setPageMessage(
       (value) => value + key
     );
+  }
+
+  async function submitPage() {
+    if (sending) return;
+    setSending(true);
+    setPageError("");
+    try {
+      await sendNumericPage(pagerNumber, pageMessage);
+      setKeypadOpen(false);
+      setPagerNumber("");
+      setPageMessage("");
+      setPageStage("number");
+      changeScreen("sent");
+      later(() => changeScreen("standby"), 1800);
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : "PAGE FAILED");
+      flashLCD();
+    } finally {
+      setSending(false);
+    }
   }
 
   function formatPagerNumber(value: string) {
@@ -271,6 +337,12 @@ export default function Pager({ number, onLogout }: { number: string; onLogout: 
     );
   }
 
+  function formatPageTime(createdAt: number) {
+    if (!createdAt) return "18:52";
+    const date = new Date(createdAt * 1000);
+    return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  }
+
   function openPhone() {
     window.location.href = "tel:";
   }
@@ -284,7 +356,11 @@ export default function Pager({ number, onLogout }: { number: string; onLogout: 
       event: KeyboardEvent
     ) {
       if (event.key === "Escape") {
-        closeKeypad();
+        setKeypadOpen(false);
+        setPagerNumber("");
+        setPageMessage("");
+        setPageError("");
+        setPageStage("number");
         setSettingsOpen(false);
       }
     }
@@ -404,17 +480,17 @@ export default function Pager({ number, onLogout }: { number: string; onLogout: 
                 <div className="lcd-enter flex h-full flex-col justify-between">
 
                   <div className="text-[clamp(30px,8vw,58px)] leading-none tracking-[.12em]">
-                    8282
+                    {receivedPage?.message || "8282"}
                   </div>
 
                   <div className="flex items-end justify-between text-[11px] tracking-[.08em] sm:text-sm">
 
                     <span>
-                      {formatPagerNumber(number)}
+                      {formatPagerNumber(receivedPage?.senderNumber || number)}
                     </span>
 
                     <span>
-                      18:52
+                      {formatPageTime(receivedPage?.createdAt || 0)}
                     </span>
 
                   </div>
@@ -549,23 +625,25 @@ export default function Pager({ number, onLogout }: { number: string; onLogout: 
 
                 {pageStage === "number"
                   ? "PAGER NUMBER"
-                  : "NUMERIC MESSAGE"}
+                  : pageError ? "PAGE ERROR" : "NUMERIC MESSAGE"}
 
               </div>
 
               <div className="keypad-value mt-2 min-h-[27px] text-xl tracking-[.16em]">
 
-                {pageStage === "number"
+                {pageError || (pageStage === "number"
                   ? formatPagerNumber(
                       pagerNumber
                     )
-                  : pageMessage || "_"}
+                  : pageMessage || "_")}
 
               </div>
 
               <div className="mt-2 text-[8px] tracking-[.12em] opacity-70">
 
-                {pageStage === "number"
+                {sending
+                  ? "TRANSMITTING..."
+                  : pageStage === "number"
                   ? `${pagerNumber.length}/7   # NEXT   * DELETE`
                   : `${pageMessage.length}/15   # SEND   * DELETE`}
 
@@ -580,6 +658,7 @@ export default function Pager({ number, onLogout }: { number: string; onLogout: 
               {KEYS.map((key) => (
                 <button
                   key={key}
+                  disabled={sending}
                   onClick={() =>
                     pressKey(key)
                   }
@@ -603,6 +682,7 @@ export default function Pager({ number, onLogout }: { number: string; onLogout: 
 
             <button
               onClick={closeKeypad}
+              disabled={sending}
               className="
                 mt-5 w-full
                 border-t border-[#4a4b45]

@@ -8,9 +8,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "pippi",
-      // Replace this value with the ID returned by: npx wrangler d1 create pippi
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_name": "ppippi_server",
+      "database_id": "e379d870-fdf5-42f1-91ee-9204c3cf964f",
       "migrations_dir": "migrations"
     }
   ],

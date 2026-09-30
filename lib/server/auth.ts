@@ -7,7 +7,7 @@ const PBKDF2_ITERATIONS = 210_000;
 const encoder = new TextEncoder();
 
 type UserRow = { id: number; pager_number: string; password_hash: string; password_salt: string };
-type SessionRow = { pager_number: string };
+type SessionRow = { id: number; pager_number: string };
 
 export class AuthError extends Error {
   constructor(message: string, public readonly status = 400) {
@@ -72,7 +72,7 @@ async function setSession(userId: number) {
   const db = await getDb();
   const token = randomToken();
   const expiresAt = Math.floor(Date.now() / 1000) + SESSION_SECONDS;
-  await db.prepare("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)")
+  await db.prepare("INSERT INTO pippi_sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)")
     .bind(await hashToken(token), userId, expiresAt).run();
   (await cookies()).set(COOKIE_NAME, token, {
     httpOnly: true,
@@ -89,7 +89,7 @@ export async function register(input: unknown) {
   const passwordHash = await derivePassword(password, salt);
   try {
     await (await getDb()).prepare(
-      "INSERT INTO users (pager_number, password_hash, password_salt) VALUES (?, ?, ?)",
+      "INSERT INTO pippi_users (pager_number, password_hash, password_salt) VALUES (?, ?, ?)",
     ).bind(number, bytesToBase64(passwordHash), bytesToBase64(salt)).run();
   } catch (error) {
     if (error instanceof Error && /unique|constraint/i.test(error.message)) throw new AuthError("IN USE", 409);
@@ -100,7 +100,7 @@ export async function register(input: unknown) {
 export async function login(input: unknown) {
   const { number, password } = validateCredentials(input);
   const user = await (await getDb()).prepare(
-    "SELECT id, pager_number, password_hash, password_salt FROM users WHERE pager_number = ?",
+    "SELECT id, pager_number, password_hash, password_salt FROM pippi_users WHERE pager_number = ?",
   ).bind(number).first<UserRow>();
   if (!user) throw new AuthError("CHECK NUMBER / PASSWORD", 401);
   const candidate = await derivePassword(password, base64ToBytes(user.password_salt));
@@ -111,22 +111,33 @@ export async function login(input: unknown) {
   return { number: user.pager_number };
 }
 
-export async function getSession() {
+export async function getAuthenticatedUser() {
   const token = (await cookies()).get(COOKIE_NAME)?.value;
   if (!token) return null;
   const session = await (await getDb()).prepare(
-    `SELECT users.pager_number FROM sessions
-     JOIN users ON users.id = sessions.user_id
-     WHERE sessions.token_hash = ? AND sessions.expires_at > ?`,
+    `SELECT pippi_users.id, pippi_users.pager_number FROM pippi_sessions
+     JOIN pippi_users ON pippi_users.id = pippi_sessions.user_id
+     WHERE pippi_sessions.token_hash = ? AND pippi_sessions.expires_at > ?`,
   ).bind(await hashToken(token), Math.floor(Date.now() / 1000)).first<SessionRow>();
-  return session ? { number: session.pager_number } : null;
+  return session ? { id: session.id, number: session.pager_number } : null;
+}
+
+export async function requireAuthenticatedUser() {
+  const user = await getAuthenticatedUser();
+  if (!user) throw new AuthError("NOT SIGNED IN", 401);
+  return user;
+}
+
+export async function getSession() {
+  const user = await getAuthenticatedUser();
+  return user ? { number: user.number } : null;
 }
 
 export async function logout() {
   const store = await cookies();
   const token = store.get(COOKIE_NAME)?.value;
   if (token) {
-    await (await getDb()).prepare("DELETE FROM sessions WHERE token_hash = ?")
+    await (await getDb()).prepare("DELETE FROM pippi_sessions WHERE token_hash = ?")
       .bind(await hashToken(token)).run();
   }
   store.set(COOKIE_NAME, "", {
@@ -136,7 +147,7 @@ export async function logout() {
 
 export async function numberIsAvailable(number: string) {
   if (!/^\d{7}$/.test(number)) throw new AuthError("ENTER 7 DIGITS");
-  const row = await (await getDb()).prepare("SELECT 1 AS found FROM users WHERE pager_number = ?")
+  const row = await (await getDb()).prepare("SELECT 1 AS found FROM pippi_users WHERE pager_number = ?")
     .bind(number).first<{ found: number }>();
   return !row;
 }

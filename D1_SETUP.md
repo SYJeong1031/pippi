@@ -11,7 +11,7 @@
 2. D1 데이터베이스 생성
 
    ```bash
-   npx wrangler d1 create pippi
+   npx wrangler d1 create ppippi_server
    ```
 
 3. 출력된 `database_id`를 `wrangler.jsonc`의 `database_id`에 붙여 넣기
@@ -44,5 +44,10 @@ npm run dev
 - `POST /api/auth/login`
 - `GET /api/auth/session`
 - `POST /api/auth/logout`
+- `POST /api/pages/send`
+- `GET /api/pages/inbox`
+- `POST /api/pages/read`
 
 비밀번호는 사용자별 salt와 PBKDF2-SHA-256(210,000회)으로 저장합니다. 로그인 세션은 30일짜리 HttpOnly, SameSite=Lax 쿠키이며 D1에는 세션 토큰 원문 대신 SHA-256 해시만 저장합니다.
+
+PAGE 송수신 기능은 앱 전용 `pippi_*` 테이블을 사용합니다. `npm run db:migrate:remote`로 `0003_pippi_schema.sql`까지 적용합니다.
