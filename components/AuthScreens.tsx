@@ -36,6 +36,7 @@ export function AuthScreen({ mode, auth, initialNumber, onSwitch, onLogin, onReg
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [check, setCheck] = useState<{ number: string; available: boolean } | null>(null);
+  const [slowCheckNumber, setSlowCheckNumber] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [registered, setRegistered] = useState(false);
@@ -49,14 +50,26 @@ export function AuthScreen({ mode, auth, initialNumber, onSwitch, onLogin, onReg
   useEffect(() => {
     if (!registering || !validNumber(number)) return;
     let cancelled = false;
+    const slowTimer = window.setTimeout(() => {
+      if (!cancelled) setSlowCheckNumber(number);
+    }, 800);
     auth.checkNumber(number).then(available => {
-      if (!cancelled) setCheck({ number, available });
-    }).catch(() => { if (!cancelled) setError("CHECK FAILED — TRY AGAIN"); });
-    return () => { cancelled = true; };
+      if (!cancelled) {
+        setCheck({ number, available });
+        setSlowCheckNumber("");
+      }
+    }).catch(() => {
+      if (!cancelled) setSlowCheckNumber(number);
+    });
+    return () => {
+      cancelled = true;
+      window.clearTimeout(slowTimer);
+    };
   }, [auth, registering, number]);
 
   const availability = !validNumber(number) ? "7 DIGITS REQUIRED" : check?.number !== number
-    ? "CHECKING..." : check.available ? "AVAILABLE" : "IN USE";
+    ? slowCheckNumber === number ? "CHECK ON REGISTER" : "CHECKING..."
+    : check.available ? "AVAILABLE" : "IN USE";
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -64,7 +77,7 @@ export function AuthScreen({ mode, auth, initialNumber, onSwitch, onLogin, onReg
     setError("");
     if (!validNumber(number)) return setError("ENTER 7 DIGITS");
     if (!password) return setError("ENTER PASSWORD");
-    if (registering && availability !== "AVAILABLE") return setError(availability);
+    if (registering && availability === "IN USE") return setError(availability);
     if (registering && password !== confirm) return setError("PASSWORDS DO NOT MATCH");
     submitting.current = true;
     setBusy(true);
@@ -95,7 +108,7 @@ export function AuthScreen({ mode, auth, initialNumber, onSwitch, onLogin, onReg
         <label htmlFor="pager-number">{registering ? "CHOOSE YOUR NUMBER" : "PAGER NUMBER"}</label>
         <input id="pager-number" name="username" type="text" inputMode="numeric" autoComplete="username"
           placeholder="___-____" value={formatNumber(number)} autoCapitalize="none" spellCheck={false}
-          onChange={event => { setNumber(normalizeNumber(event.target.value)); setCheck(null); setError(""); }} />
+          onChange={event => { setNumber(normalizeNumber(event.target.value)); setCheck(null); setSlowCheckNumber(""); setError(""); }} />
         {registering && <p className="availability" role="status">{availability}</p>}
         <label htmlFor="password">PASSWORD</label>
         <input id="password" name="password" type="password" autoComplete={registering ? "new-password" : "current-password"}
@@ -103,7 +116,7 @@ export function AuthScreen({ mode, auth, initialNumber, onSwitch, onLogin, onReg
         {registering && <><label htmlFor="confirm">CONFIRM</label><input id="confirm" name="confirm" type="password"
           autoComplete="new-password" value={confirm} onChange={event => { setConfirm(event.target.value); setError(""); }} /></>}
         <p className="auth-error" role="alert">{error || "\u00a0"}</p>
-        <button className="auth-key" type="submit" disabled={busy || (registering && availability !== "AVAILABLE")}>
+        <button className="auth-key" type="submit" disabled={busy || (registering && availability === "IN USE")}>
           {busy ? "PLEASE WAIT..." : registering ? "REGISTER" : "ENTER"}
         </button>
         <button className="auth-back" type="button" onClick={onSwitch}>{registering ? "BACK" : "NEW USER → REGISTER"}</button>
