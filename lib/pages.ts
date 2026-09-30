@@ -1,39 +1,32 @@
+import { getPages, markPageViewed, sendPage } from "./api";
+
 export type ReceivedPage = {
-  id: number;
+  id: string | number;
   senderNumber: string;
   message: string;
   createdAt: number;
 };
 
-type ApiError = { error?: string };
-
-async function readJson<T>(response: Response): Promise<T> {
-  const body = (await response.json().catch(() => ({}))) as T & ApiError;
-  if (!response.ok) throw new Error(body.error || "PAGE FAILED");
-  return body;
-}
-
 export async function sendNumericPage(recipientNumber: string, message: string) {
-  return readJson<{ id: number }>(await fetch("/api/pages/send", {
-    method: "POST",
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ recipientNumber, message }),
-  }));
+  return sendPage(recipientNumber, message);
 }
 
-export async function getUnreadPage() {
-  return readJson<{ page: ReceivedPage | null }>(await fetch("/api/pages/inbox", {
-    credentials: "same-origin",
-    cache: "no-store",
-  })).then((result) => result.page);
+export async function getUnreadPage(): Promise<ReceivedPage | null> {
+  const pages = await getPages();
+  const page = pages
+    .filter((item) => item.viewed_at === null)
+    .sort((left, right) => Date.parse(left.created_at) - Date.parse(right.created_at))[0];
+
+  if (!page) return null;
+  return {
+    id: page.id,
+    senderNumber: page.sender_pager_no,
+    message: page.message,
+    createdAt: Math.floor(Date.parse(page.created_at) / 1000),
+  };
 }
 
-export async function markPageRead(id: number) {
-  await readJson<{ ok: true }>(await fetch("/api/pages/read", {
-    method: "POST",
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id }),
-  }));
+export async function markPageRead(id: string | number) {
+  if (id === 0) return;
+  await markPageViewed(String(id));
 }

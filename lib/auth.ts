@@ -20,7 +20,9 @@ type LoginResponse = {
   pagerNo: string;
 };
 
-const API_URL = "https://ppippi-api.ssyyjeong2012.workers.dev";
+// Keep browser requests same-origin. The Next.js proxy forwards them to the Worker,
+// avoiding CORS differences between local, preview, and production domains.
+const API_URL = "/api/worker";
 
 const TOKEN_KEY = "pippi_token";
 const NUMBER_KEY = "pippi_pager_no";

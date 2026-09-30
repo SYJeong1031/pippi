@@ -114,7 +114,7 @@ function playPagerAlert() {
 export default function Pager({ number, onLogout }: { number: string; onLogout: () => void }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const timers = useRef<Set<number>>(new Set());
-  const receivedPageId = useRef<number | null>(null);
+  const receivedPageId = useRef<string | number | null>(null);
   function later(callback: () => void, delay: number) {
     const timer = window.setTimeout(() => {
       timers.current.delete(timer);
@@ -210,7 +210,7 @@ export default function Pager({ number, onLogout }: { number: string; onLogout: 
     }
 
     if (screen === "new") {
-      if (receivedPage && receivedPage.id > 0) void markPageRead(receivedPage.id);
+      if (receivedPage && receivedPage.id !== 0) void markPageRead(receivedPage.id);
       changeScreen("message");
       return;
     }

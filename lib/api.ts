@@ -1,4 +1,4 @@
-const API_URL = "https://ppippi-api.ssyyjeong2012.workers.dev";
+const API_URL = "/api/worker";
 
 export type ApiPage = {
   id: string;
