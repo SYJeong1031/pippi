@@ -24,3 +24,57 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Authentication uses the same plastic / LCD palette as the original pager. */
+.auth-stage { min-height: 100svh; display:flex; align-items:center; justify-content:center; padding:24px 16px; background:#918c80; }
+.auth-shell { width:100%; max-width:400px; padding:24px; border:3px solid #080808; border-radius:22px 18px 20px 24px; background:#171816; box-shadow:0 26px 45px #0006,inset 0 2px 1px #ffffff1f,inset 0 -5px 8px #000a; }
+.auth-bezel { border:5px solid #070807; padding:10px; border-radius:7px; background:#0b0c0b; box-shadow:inset 0 3px 9px #000; }
+.auth-lcd { position:relative; background:#9faa8e; color:#20291d; padding:20px 16px; border:1px solid #4c5546; box-shadow:inset 0 0 22px #2b372661; font-family:var(--font-geist-mono),monospace; font-weight:700; }
+.auth-lcd::after { content:""; position:absolute; inset:0; pointer-events:none; opacity:.18; background:repeating-linear-gradient(0deg,transparent 0 3px,#5c6654 4px); }
+.auth-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:26px; }
+.auth-heading h1,.boot-screen h1 { font-size:24px; letter-spacing:.16em; }
+.auth-heading span { font-size:9px; letter-spacing:.12em; }
+.auth-lcd fieldset { min-width:0; }
+.auth-lcd label { display:block; font-size:10px; letter-spacing:.1em; margin-bottom:6px; }
+.auth-lcd input { display:block; width:100%; min-width:0; height:44px; padding:6px 8px; margin-bottom:18px; border:1px solid #526047; border-bottom:2px solid #34432b; border-radius:0; background:#77886a33; color:#20291d; font:inherit; font-size:20px; letter-spacing:.08em; outline-offset:3px; }
+.auth-lcd input::placeholder { color:#394831; opacity:.7; }
+.auth-lcd input:focus-visible { outline:2px solid #34432b; }
+.availability { font-size:10px; letter-spacing:.1em; margin:-10px 0 18px; min-height:15px; }
+.auth-error { font-size:10px; min-height:28px; overflow-wrap:anywhere; }
+.auth-key { width:100%; min-height:44px; border:2px solid #080808; border-radius:5px; background:#252623; color:#c6c5bd; font-size:12px; letter-spacing:.18em; box-shadow:inset 0 2px 1px #ffffff1a,0 4px 0 #090909; transition:transform 45ms steps(2,end); }
+.auth-key:active { transform:translateY(3px); box-shadow:inset 0 2px 4px #000c,0 1px 0 #090909; }
+.auth-key:disabled { opacity:.55; }
+.auth-back { display:block; width:100%; min-height:44px; margin-top:12px; font-size:10px; letter-spacing:.04em; }
+.auth-brand { color:#aaa9a3; font-weight:900; font-style:italic; letter-spacing:.2em; font-size:13px; margin-top:20px; }
+.auth-brand span { display:block; font:8px monospace; letter-spacing:.12em; margin-top:5px; }
+.auth-enter { animation:authFlicker 150ms steps(3,end); }
+.boot-screen { min-height:230px; display:flex; flex-direction:column; justify-content:center; gap:20px; font-size:12px; letter-spacing:.15em; animation:authFlicker 130ms steps(3,end) 1250ms; }
+.boot-check { animation:bootReveal 1ms steps(1,end) 250ms both; }
+.boot-progress { width:0; max-width:8ch; overflow:hidden; white-space:nowrap; letter-spacing:0; font-size:20px; animation:bootProgress 600ms steps(8,end) 300ms forwards; }
+.boot-ready { animation:bootReveal 1ms steps(1,end) 1000ms both; }
+.registered-screen { min-height:280px; display:flex; align-items:center; justify-content:center; letter-spacing:.1em; animation:authFlicker 150ms steps(3,end); }
+.settings-switch { position:absolute; left:6%; bottom:4%; width:44px; height:44px; color:#aaa9a3; font:12px monospace; letter-spacing:2px; }
+.pager-settings { display:flex; height:100%; align-items:center; justify-content:space-between; gap:8px; font-size:10px; }
+.pager-settings strong { display:block; font-size:clamp(16px,4vw,26px); margin-top:6px; }
+.pager-settings button { min-height:44px; border-bottom:1px solid #34432b; white-space:nowrap; }
+.keypad-value { overflow-wrap:anywhere; }
+button { cursor:pointer; }
+button:disabled { cursor:default; }
+button:focus-visible { outline:2px solid #c6c5bd; outline-offset:3px; }
+@keyframes authFlicker { 0%,60% { opacity:.35; } 30%,100% { opacity:1; } }
+@keyframes bootReveal { from { opacity:0; } to { opacity:1; } }
+@keyframes bootProgress { to { width:8ch; } }
+@media(max-width:400px) {
+  .auth-shell { padding:16px; }
+  .auth-bezel { padding:6px; }
+  .auth-lcd { padding:18px 12px; }
+  .pager-shell { min-height:206px; }
+  .settings-switch { left:auto; right:4%; bottom:-48px; height:44px; color:#20291d; }
+  .pager-brand { top:62%; font-size:10px; }
+  .keypad-value { font-size:16px; letter-spacing:.08em; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .auth-enter,.boot-screen,.registered-screen,.pager-buzz,.lcd-flash,.lcd-enter,.lcd-blink,.keypad-pop,.keypad-backdrop { animation:none !important; }
+  .boot-check,.boot-ready { animation:none; opacity:1; }
+  .boot-progress { animation:none; width:8ch; }
+}
