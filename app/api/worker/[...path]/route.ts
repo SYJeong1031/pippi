@@ -8,7 +8,7 @@ type RouteContext = { params: Promise<{ path: string[] }> };
 async function proxy(request: Request, context: RouteContext) {
   const { path } = await context.params;
   const incomingUrl = new URL(request.url);
-  const target = new URL(`/api/${path.map(encodeURIComponent).join("/")}`, WORKER_ORIGIN);
+  const target = new URL(`/${path.map(encodeURIComponent).join("/")}`, WORKER_ORIGIN);
   target.search = incomingUrl.search;
 
   const headers = new Headers();
